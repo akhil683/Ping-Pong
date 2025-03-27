@@ -16,6 +16,7 @@
     "bcryptjs": "^3.0.2",
     "canvas-confetti": "^1.9.3",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
     "drizzle-orm": "^0.41.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.484.0",
