@@ -16,6 +16,14 @@ import {
 import Logo from "../logo"
 import GameLeaderboard from "./game-leaderboard"
 
+export interface PlayerType {
+  id: number,
+  name: string,
+  points: number,
+  color: string,
+  avatar: string,
+  isDrawing?: boolean | false,
+}
 export default function GamePage() {
   const [currentRound, setCurrentRound] = useState(3)
   const [totalRounds, setTotalRounds] = useState(3)
@@ -53,7 +61,7 @@ export default function GamePage() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
 
-  const players = [
+  const players: PlayerType[] = [
     { id: 4, name: "Ishish", points: 2870, color: "#ffff00", avatar: "yellow" },
     { id: 7, name: "Nrivy", points: 225, color: "#ffff00", avatar: "yellow" },
     { id: 3, name: "hi", points: 2980, color: "#66ffff", avatar: "cyan" },

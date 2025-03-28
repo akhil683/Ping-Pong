@@ -1,8 +1,10 @@
+import { PlayerType } from "./game-page"
+
 interface PropType {
   timeLeft: number,
   currentRound: number,
   totalRounds: number,
-  players: any,
+  players: PlayerType[],
 }
 
 export default function GameLeaderboard({ timeLeft, currentRound, totalRounds, players }: PropType) {
@@ -38,7 +40,7 @@ export default function GameLeaderboard({ timeLeft, currentRound, totalRounds, p
   )
 }
 
-function Avatar({ color }) {
+function Avatar({ color }: { color: string }) {
   return (
     <div className="relative w-full h-full">
       <div className="absolute inset-0 rounded-full" style={{ backgroundColor: color }}></div>
