@@ -3,8 +3,18 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Settings, ThumbsUp, ThumbsDown, Send } from "lucide-react"
+import {
+  Settings,
+  ThumbsUp,
+  ThumbsDown,
+  Send,
+  Square,
+  Circle,
+  Triangle,
+  RectangleVerticalIcon as Rectangle,
+} from "lucide-react"
 import Logo from "../logo"
+import GameLeaderboard from "./game-leaderboard"
 
 export default function GamePage() {
   const [currentRound, setCurrentRound] = useState(3)
@@ -16,6 +26,8 @@ export default function GamePage() {
   const [currentWord, setCurrentWord] = useState("__________")
   const [currentDrawer, setCurrentDrawer] = useState("Aryaaa")
   const [guessInput, setGuessInput] = useState("")
+  const [currentTool, setCurrentTool] = useState("pen") // pen, eraser, rectangle, square, triangle, circle
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const [messages, setMessages] = useState([
     { type: "system", content: "Game started! Round 1 of 3" },
     { type: "system", content: "Aryaaa is drawing now!" },
@@ -37,6 +49,7 @@ export default function GamePage() {
     { type: "system", content: "Aryaaa is drawing now!" },
   ])
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
 
@@ -72,6 +85,15 @@ export default function GamePage() {
 
   const brushSizes = [2, 5, 10, 15, 25, 35]
 
+  const tools = [
+    { id: "pen", icon: null, label: "Pen" },
+    { id: "eraser", icon: null, label: "Eraser" },
+    { id: "rectangle", icon: <Rectangle size={20} />, label: "Rectangle" },
+    { id: "square", icon: <Square size={20} />, label: "Square" },
+    { id: "circle", icon: <Circle size={20} />, label: "Circle" },
+    { id: "triangle", icon: <Triangle size={20} />, label: "Triangle" },
+  ]
+
   useEffect(() => {
     // Timer countdown
     const timer = setInterval(() => {
@@ -90,7 +112,8 @@ export default function GamePage() {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    const previewCanvas = previewCanvasRef.current
+    if (!canvas || !previewCanvas) return
 
     // Make canvas responsive
     const resizeCanvas = () => {
@@ -98,8 +121,13 @@ export default function GamePage() {
       if (!parent) return
 
       // Set canvas dimensions to match parent container
-      canvas.width = parent.clientWidth
-      canvas.height = parent.clientHeight - 40 // Leave space for tools
+      const width = parent.clientWidth
+      const height = parent.clientHeight - 40 // Leave space for tools
+
+      canvas.width = width
+      canvas.height = height
+      previewCanvas.width = width
+      previewCanvas.height = height
 
       // Redraw canvas with white background
       const ctx = canvas.getContext("2d")
@@ -116,45 +144,140 @@ export default function GamePage() {
     window.addEventListener("resize", resizeCanvas)
 
     const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    const previewCtx = previewCanvas.getContext("2d")
+    if (!ctx || !previewCtx) return
 
     // Setup event listeners for drawing
     const startDrawing = (x: number, y: number) => {
       setIsDrawing(true)
+      setStartPos({ x, y })
       setLastPos({ x, y })
 
-      // For eraser, we draw white
-      if (currentColor === "eraser") {
-        ctx.globalCompositeOperation = "destination-out"
-      } else {
-        ctx.globalCompositeOperation = "source-over"
+      if (currentTool === "pen" || currentTool === "eraser") {
+        // For eraser, we draw white
+        if (currentTool === "eraser") {
+          ctx.globalCompositeOperation = "destination-out"
+        } else {
+          ctx.globalCompositeOperation = "source-over"
+        }
+
+        // Start drawing for pen/eraser
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x, y)
+        ctx.strokeStyle = currentTool === "eraser" ? "#ffffff" : currentColor
+        ctx.lineWidth = brushSize
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+        ctx.stroke()
       }
     }
 
     const draw = (x: number, y: number) => {
       if (!isDrawing) return
 
-      ctx.beginPath()
-      ctx.moveTo(lastPos.x, lastPos.y)
-      ctx.lineTo(x, y)
+      if (currentTool === "pen" || currentTool === "eraser") {
+        // Continue drawing for pen/eraser
+        ctx.beginPath()
+        ctx.moveTo(lastPos.x, lastPos.y)
+        ctx.lineTo(x, y)
 
-      if (currentColor === "eraser") {
-        ctx.strokeStyle = "#ffffff"
-        ctx.globalCompositeOperation = "destination-out"
+        if (currentTool === "eraser") {
+          ctx.strokeStyle = "#ffffff"
+          ctx.globalCompositeOperation = "destination-out"
+        } else {
+          ctx.strokeStyle = currentColor
+          ctx.globalCompositeOperation = "source-over"
+        }
+
+        ctx.lineWidth = brushSize
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+        ctx.stroke()
+
+        setLastPos({ x, y })
       } else {
-        ctx.strokeStyle = currentColor
-        ctx.globalCompositeOperation = "source-over"
+        // For shapes, we preview on the preview canvas
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
+        previewCtx.strokeStyle = currentColor
+        previewCtx.lineWidth = brushSize
+        previewCtx.lineCap = "round"
+        previewCtx.lineJoin = "round"
+        previewCtx.beginPath()
+
+        const startX = startPos.x
+        const startY = startPos.y
+
+        switch (currentTool) {
+          case "rectangle":
+            previewCtx.rect(startX, startY, x - startX, y - startY)
+            break
+          case "square":
+            const size = Math.max(Math.abs(x - startX), Math.abs(y - startY))
+            const signX = x >= startX ? 1 : -1
+            const signY = y >= startY ? 1 : -1
+            previewCtx.rect(startX, startY, size * signX, size * signY)
+            break
+          case "circle":
+            const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2))
+            previewCtx.arc(startX, startY, radius, 0, Math.PI * 2)
+            break
+          case "triangle":
+            previewCtx.moveTo(startX, startY)
+            previewCtx.lineTo(x, y)
+            previewCtx.lineTo(startX - (x - startX), y)
+            previewCtx.closePath()
+            break
+        }
+
+        previewCtx.stroke()
       }
-
-      ctx.lineWidth = brushSize
-      ctx.lineCap = "round"
-      ctx.lineJoin = "round"
-      ctx.stroke()
-
-      setLastPos({ x, y })
     }
 
     const stopDrawing = () => {
+      if (!isDrawing) return
+
+      if (currentTool !== "pen" && currentTool !== "eraser") {
+        // For shapes, draw the final shape on the main canvas
+        ctx.strokeStyle = currentColor
+        ctx.lineWidth = brushSize
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+        ctx.beginPath()
+
+        const startX = startPos.x
+        const startY = startPos.y
+        const endX = lastPos.x
+        const endY = lastPos.y
+
+        switch (currentTool) {
+          case "rectangle":
+            ctx.rect(startX, startY, endX - startX, endY - startY)
+            break
+          case "square":
+            const size = Math.max(Math.abs(endX - startX), Math.abs(endY - startY))
+            const signX = endX >= startX ? 1 : -1
+            const signY = endY >= startY ? 1 : -1
+            ctx.rect(startX, startY, size * signX, size * signY)
+            break
+          case "circle":
+            const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))
+            ctx.arc(startX, startY, radius, 0, Math.PI * 2)
+            break
+          case "triangle":
+            ctx.moveTo(startX, startY)
+            ctx.lineTo(endX, endY)
+            ctx.lineTo(startX - (endX - startX), endY)
+            ctx.closePath()
+            break
+        }
+
+        ctx.stroke()
+
+        // Clear the preview canvas
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
+      }
+
       setIsDrawing(false)
     }
 
@@ -171,6 +294,7 @@ export default function GamePage() {
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
       draw(x, y)
+      setLastPos({ x, y })
     }
 
     // Touch events
@@ -196,6 +320,7 @@ export default function GamePage() {
       const y = touch.clientY - rect.top
 
       draw(x, y)
+      setLastPos({ x, y })
     }
 
     canvas.addEventListener("mousedown", handleMouseDown)
@@ -219,18 +344,22 @@ export default function GamePage() {
       canvas.removeEventListener("touchmove", handleTouchMove)
       canvas.removeEventListener("touchend", stopDrawing)
     }
-  }, [isDrawing, lastPos, currentColor, brushSize])
+  }, [isDrawing, lastPos, currentColor, brushSize, currentTool, startPos])
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    const previewCanvas = previewCanvasRef.current
+    if (!canvas || !previewCanvas) return
 
     const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    const previewCtx = previewCanvas.getContext("2d")
+    if (!ctx || !previewCtx) return
 
     ctx.fillStyle = "#ffffff"
     ctx.globalCompositeOperation = "source-over"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
   }
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -253,46 +382,33 @@ export default function GamePage() {
     setGuessInput("")
   }
 
-  return (
-    <div className="min-h-screen bg-blue-600 flex flex-col">
+  const handleToolSelect = (tool: string) => {
+    setCurrentTool(tool)
 
-      {/* Logo */}
-      <div className="flex text-4xl justify-center py-2 relative z-10">
+    // If selecting eraser, keep it as eraser
+    // If selecting another tool, set color back to previous if it was eraser
+    if (tool === "eraser") {
+      setCurrentColor("eraser")
+    } else if (currentColor === "eraser") {
+      setCurrentColor("#000000")
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-blue-500 flex flex-col">
+      <div className="flex justify-center text-4xl py-2 relative z-10">
         <Logo />
       </div>
 
       {/* Main Game Area */}
       <div className="flex flex-1 px-4 pb-4 gap-4 relative z-10">
         {/* Left Sidebar - Player List */}
-        <div className="w-64 bg-white/90 backdrop-blur-sm rounded-lg overflow-hidden shadow-xl border border-white/20">
-          <div className="flex items-center bg-gray-100 p-2">
-            <div className="bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center font-bold text-gray-700 animate-pulse-slow">
-              {timeLeft}
-            </div>
-            <div className="ml-2 font-bold">
-              Round {currentRound} of {totalRounds}
-            </div>
-          </div>
-
-          <div className="divide-y">
-            {players.map((player) => (
-              <div
-                key={player.id}
-                className={`flex items-center p-2 ${player.isDrawing ? "bg-gray-100" : ""} ${player.isDrawing ? "animate-pulse-slow" : ""}`}
-              >
-                <div className="w-8 text-right font-bold text-gray-700 mr-2">#{player.id}</div>
-                <div className="relative w-10 h-10 flex-shrink-0">
-                  <Avatar color={player.color} />
-                </div>
-                <div className="ml-2 flex-1 overflow-hidden">
-                  <div className="font-bold truncate">{player.name}</div>
-                  <div className="text-sm text-gray-600">{player.points} points</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+        <GameLeaderboard
+          currentRound={currentRound}
+          totalRounds={totalRounds}
+          timeLeft={timeLeft}
+          players={players}
+        />
         {/* Main Game Content */}
         <div className="flex-1 flex flex-col">
           {/* Word to Guess */}
@@ -307,10 +423,10 @@ export default function GamePage() {
             <div className="flex-1 bg-white rounded-lg overflow-hidden relative shadow-xl border border-white/20">
               {/* Thumbs up/down */}
               <div className="absolute top-2 right-2 flex gap-2 z-10">
-                <button className="p-1 bg-green-100 rounded-full hover:bg-green-200 transition-colors">
+                <button className="p-1 bg-green-100 rounded-full hover:bg-green-200 cursor-pointer transition-colors">
                   <ThumbsUp className="w-6 h-6 text-green-600" />
                 </button>
-                <button className="p-1 bg-red-100 rounded-full hover:bg-red-200 transition-colors">
+                <button className="p-1 bg-red-100 rounded-full hover:bg-red-200 transition-colors cursor-pointer">
                   <ThumbsDown className="w-6 h-6 text-red-600" />
                 </button>
               </div>
@@ -318,10 +434,67 @@ export default function GamePage() {
               {/* Canvas */}
               <div className="w-full h-full relative">
                 <canvas ref={canvasRef} className="absolute top-0 left-0 touch-none" style={{ cursor: "crosshair" }} />
+                <canvas
+                  ref={previewCanvasRef}
+                  className="absolute top-0 left-0 touch-none pointer-events-none"
+                  style={{ zIndex: 1 }}
+                />
               </div>
 
               {/* Drawing Tools */}
               <div className="absolute bottom-0 left-0 right-0 bg-gray-100/90 backdrop-blur-sm p-2 flex flex-wrap items-center gap-2 border-t border-gray-200">
+                {/* Tool Selection */}
+                <div className="flex gap-1 mr-3">
+                  {tools.map((tool) => (
+                    <button
+                      key={tool.id}
+                      className={`w-8 h-8 rounded-sm flex items-center justify-center ${currentTool === tool.id ? "bg-blue-500" : "bg-gray-500"} transition-colors`}
+                      style={{ border: "1px solid #ccc" }}
+                      onClick={() => handleToolSelect(tool.id)}
+                      title={tool.label}
+                    >
+                      {tool.icon ? (
+                        tool.icon
+                      ) : (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          {tool.id === "pen" ? (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                            </svg>
+                          ) : (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                              <path d="M15 3h6v6"></path>
+                              <path d="m10 14 11-11"></path>
+                            </svg>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Color Selection */}
                 <div className="flex flex-wrap gap-1 mr-2">
                   {colors.map((color) => (
                     <button
@@ -330,8 +503,17 @@ export default function GamePage() {
                       style={{
                         backgroundColor: color === "eraser" ? "#ffffff" : color,
                         border: "1px solid #ccc",
+                        opacity: currentTool === "eraser" && color !== "eraser" ? 0.5 : 1,
                       }}
-                      onClick={() => setCurrentColor(color)}
+                      onClick={() => {
+                        setCurrentColor(color)
+                        if (color === "eraser") {
+                          setCurrentTool("eraser")
+                        } else if (currentTool === "eraser") {
+                          setCurrentTool("pen")
+                        }
+                      }}
+                      disabled={currentTool === "eraser" && color !== "eraser"}
                     >
                       {color === "eraser" && (
                         <div className="w-6 h-6 flex items-center justify-center">
@@ -356,6 +538,7 @@ export default function GamePage() {
                   ))}
                 </div>
 
+                {/* Brush Size Selection */}
                 <div className="flex gap-1 mr-2">
                   {brushSizes.map((size) => (
                     <button
@@ -376,6 +559,7 @@ export default function GamePage() {
                   ))}
                 </div>
 
+                {/* Clear Button */}
                 <button
                   className="px-3 py-1 bg-red-500 text-white rounded-sm hover:bg-red-600 transition-colors transform hover:scale-105 active:scale-95"
                   onClick={clearCanvas}
@@ -386,12 +570,12 @@ export default function GamePage() {
             </div>
 
             {/* Chat Container */}
-            <div className="w-64 bg-white/90 backdrop-blur-sm rounded-lg overflow-hidden shadow-xl border border-white/20 flex flex-col">
+            <div className="w-72 bg-white/90 backdrop-blur-sm rounded-lg overflow-hidden shadow-xl border border-white/20 flex flex-col">
               {/* Chat Messages */}
               <div
                 ref={chatContainerRef}
                 className="flex-1 overflow-y-auto p-2 space-y-2"
-                style={{ maxHeight: "calc(100% - 50px)" }}
+                style={{ maxHeight: "calc(70vh - 50px)" }}
               >
                 {messages.map((message, index) => (
                   <div key={index} className={`${message.type === "system" ? "text-center italic text-gray-500" : ""}`}>
@@ -414,13 +598,13 @@ export default function GamePage() {
                 <input
                   type="text"
                   placeholder="Type your guess here..."
-                  className="flex-1 bg-white p-2 rounded-l-md border-2 border-blue-500 focus:outline-none placeholder:text-gray-500 text-black"
+                  className="flex-1 p-2 rounded-l-md border-2 placeholder:text-gray-600 text-black border-blue-500 focus:outline-none"
                   value={guessInput}
                   onChange={(e) => setGuessInput(e.target.value)}
                 />
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 h-full transition-colors"
+                  className="bg-blue-500 text-white p-2 rounded-r-md h-full hover:bg-blue-600 transition-colors"
                 >
                   <Send size={18} />
                 </button>
@@ -434,31 +618,6 @@ export default function GamePage() {
           <Settings className="w-6 h-6" />
         </button>
       </div>
-
-      {/* Ad Banner */}
-      {/* <div className="absolute right-4 top-32 hidden lg:block z-10"> */}
-      {/*   <div className="w-64 h-96 bg-gray-200 rounded overflow-hidden shadow-xl"> */}
-      {/*     <Image */}
-      {/*       src="/placeholder.svg?height=384&width=256" */}
-      {/*       alt="Advertisement" */}
-      {/*       width={256} */}
-      {/*       height={384} */}
-      {/*       className="w-full h-full object-cover" */}
-      {/*     /> */}
-      {/*   </div> */}
-      {/* </div> */}
-    </div>
-  )
-}
-
-function Avatar({ color }) {
-  return (
-    <div className="relative w-full h-full">
-      <div className="absolute inset-0 rounded-full" style={{ backgroundColor: color }}></div>
-      <div className="absolute top-1/4 left-1/2 transform -translate-x-1/2 w-3/5 h-1/5 bg-white rounded-full flex justify-center items-center">
-        <div className="w-1/2 h-3/4 bg-black rounded-full"></div>
-      </div>
-      <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 w-2/5 h-1/6 bg-black rounded-full"></div>
     </div>
   )
 }
