@@ -1,7 +1,10 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useRef, useEffect } from "react"
-import { Settings, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Settings, ThumbsUp, ThumbsDown, Send } from "lucide-react"
+import Logo from "../logo"
 
 export default function GamePage() {
   const [currentRound, setCurrentRound] = useState(3)
@@ -12,7 +15,29 @@ export default function GamePage() {
   const [brushSize, setBrushSize] = useState(5)
   const [currentWord, setCurrentWord] = useState("__________")
   const [currentDrawer, setCurrentDrawer] = useState("Aryaaa")
+  const [guessInput, setGuessInput] = useState("")
+  const [messages, setMessages] = useState([
+    { type: "system", content: "Game started! Round 1 of 3" },
+    { type: "system", content: "Aryaaa is drawing now!" },
+    { type: "message", player: "Ishish", content: "is it a car?", color: "#ffff00" },
+    { type: "message", player: "Nrivy", content: "looks like a house", color: "#ffff00" },
+    { type: "system", content: "hi is close to the answer!" },
+    { type: "message", player: "hi", content: "building?", color: "#66ffff" },
+    { type: "message", player: "Rmmmmmmmmmm", content: "maybe a castle?", color: "#66ffff" },
+    { type: "message", player: "inschool", content: "tower!", color: "#333333" },
+    { type: "system", content: "inschool guessed the word!" },
+    { type: "message", player: "X-Ray", content: "nice one!", color: "#ff8800" },
+    { type: "message", player: "poing (You)", content: "good job", color: "#ff4040" },
+    { type: "system", content: "Round 2 of 3" },
+    { type: "system", content: "inschool is drawing now!" },
+    { type: "message", player: "Ishish", content: "is that a dog?", color: "#ffff00" },
+    { type: "message", player: "hi", content: "cat maybe?", color: "#66ffff" },
+    { type: "system", content: "Ishish guessed the word!" },
+    { type: "system", content: "Round 3 of 3" },
+    { type: "system", content: "Aryaaa is drawing now!" },
+  ])
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
 
   const players = [
@@ -42,6 +67,7 @@ export default function GamePage() {
     "#ff88cc",
     "#884400",
     "#44aaaa",
+    "eraser", // Special value for eraser
   ]
 
   const brushSizes = [2, 5, 10, 15, 25, 35]
@@ -56,52 +82,98 @@ export default function GamePage() {
   }, [])
 
   useEffect(() => {
+    // Scroll chat to bottom when messages change
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+
+    // Make canvas responsive
+    const resizeCanvas = () => {
+      const parent = canvas.parentElement
+      if (!parent) return
+
+      // Set canvas dimensions to match parent container
+      canvas.width = parent.clientWidth
+      canvas.height = parent.clientHeight - 40 // Leave space for tools
+
+      // Redraw canvas with white background
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.fillStyle = "#ffffff"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+
+    // Initial resize
+    resizeCanvas()
+
+    // Resize on window resize
+    window.addEventListener("resize", resizeCanvas)
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Set canvas to white background
-    ctx.fillStyle = "#ffffff"
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
     // Setup event listeners for drawing
-    const handleMouseDown = (e: MouseEvent) => {
+    const startDrawing = (x: number, y: number) => {
       setIsDrawing(true)
-      const rect = canvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
       setLastPos({ x, y })
+
+      // For eraser, we draw white
+      if (currentColor === "eraser") {
+        ctx.globalCompositeOperation = "destination-out"
+      } else {
+        ctx.globalCompositeOperation = "source-over"
+      }
     }
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const draw = (x: number, y: number) => {
       if (!isDrawing) return
-
-      const rect = canvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
 
       ctx.beginPath()
       ctx.moveTo(lastPos.x, lastPos.y)
       ctx.lineTo(x, y)
-      ctx.strokeStyle = currentColor
+
+      if (currentColor === "eraser") {
+        ctx.strokeStyle = "#ffffff"
+        ctx.globalCompositeOperation = "destination-out"
+      } else {
+        ctx.strokeStyle = currentColor
+        ctx.globalCompositeOperation = "source-over"
+      }
+
       ctx.lineWidth = brushSize
       ctx.lineCap = "round"
+      ctx.lineJoin = "round"
       ctx.stroke()
 
       setLastPos({ x, y })
     }
 
-    const handleMouseUp = () => {
+    const stopDrawing = () => {
       setIsDrawing(false)
     }
 
-    const handleMouseLeave = () => {
-      setIsDrawing(false)
+    // Mouse events
+    const handleMouseDown = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      startDrawing(x, y)
     }
 
-    // Touch events for mobile
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      draw(x, y)
+    }
+
+    // Touch events
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault()
       if (e.touches.length !== 1) return
@@ -111,8 +183,7 @@ export default function GamePage() {
       const x = touch.clientX - rect.left
       const y = touch.clientY - rect.top
 
-      setIsDrawing(true)
-      setLastPos({ x, y })
+      startDrawing(x, y)
     }
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -124,40 +195,29 @@ export default function GamePage() {
       const x = touch.clientX - rect.left
       const y = touch.clientY - rect.top
 
-      ctx.beginPath()
-      ctx.moveTo(lastPos.x, lastPos.y)
-      ctx.lineTo(x, y)
-      ctx.strokeStyle = currentColor
-      ctx.lineWidth = brushSize
-      ctx.lineCap = "round"
-      ctx.stroke()
-
-      setLastPos({ x, y })
-    }
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      e.preventDefault()
-      setIsDrawing(false)
+      draw(x, y)
     }
 
     canvas.addEventListener("mousedown", handleMouseDown)
     canvas.addEventListener("mousemove", handleMouseMove)
-    canvas.addEventListener("mouseup", handleMouseUp)
-    canvas.addEventListener("mouseleave", handleMouseLeave)
+    canvas.addEventListener("mouseup", stopDrawing)
+    canvas.addEventListener("mouseleave", stopDrawing)
 
     canvas.addEventListener("touchstart", handleTouchStart)
     canvas.addEventListener("touchmove", handleTouchMove)
-    canvas.addEventListener("touchend", handleTouchEnd)
+    canvas.addEventListener("touchend", stopDrawing)
 
     return () => {
+      window.removeEventListener("resize", resizeCanvas)
+
       canvas.removeEventListener("mousedown", handleMouseDown)
       canvas.removeEventListener("mousemove", handleMouseMove)
-      canvas.removeEventListener("mouseup", handleMouseUp)
-      canvas.removeEventListener("mouseleave", handleMouseLeave)
+      canvas.removeEventListener("mouseup", stopDrawing)
+      canvas.removeEventListener("mouseleave", stopDrawing)
 
       canvas.removeEventListener("touchstart", handleTouchStart)
       canvas.removeEventListener("touchmove", handleTouchMove)
-      canvas.removeEventListener("touchend", handleTouchEnd)
+      canvas.removeEventListener("touchend", stopDrawing)
     }
   }, [isDrawing, lastPos, currentColor, brushSize])
 
@@ -169,42 +229,44 @@ export default function GamePage() {
     if (!ctx) return
 
     ctx.fillStyle = "#ffffff"
+    ctx.globalCompositeOperation = "source-over"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
   }
 
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!guessInput.trim()) return
+
+    // Add message to chat
+    setMessages([
+      ...messages,
+      {
+        type: "message",
+        player: "poing (You)",
+        content: guessInput,
+        color: "#ff4040",
+      },
+    ])
+
+    // Clear input
+    setGuessInput("")
+  }
+
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ backgroundColor: "#1a5cb0", backgroundImage: "url('/doodle-pattern.svg')" }}
-    >
+    <div className="min-h-screen bg-blue-600 flex flex-col">
+
       {/* Logo */}
-      <div className="flex justify-center py-2">
-        <h1 className="text-4xl font-bold">
-          <span className="text-red-500">s</span>
-          <span className="text-orange-500">k</span>
-          <span className="text-yellow-400">r</span>
-          <span className="text-green-500">i</span>
-          <span className="text-cyan-400">b</span>
-          <span className="text-blue-500">b</span>
-          <span className="text-white">l</span>
-          <span className="text-pink-500">.</span>
-          <span className="text-indigo-500">i</span>
-          <span className="text-orange-500">o</span>
-          <span className="inline-block ml-1 transform rotate-12">
-            <div className="w-4 h-8 bg-orange-500 rounded-t-sm relative">
-              <div className="absolute top-0 w-4 h-1.5 bg-yellow-300"></div>
-              <div className="absolute bottom-0 left-1/2 w-0.5 h-2 bg-black transform -translate-x-1/2"></div>
-            </div>
-          </span>
-        </h1>
+      <div className="flex text-4xl justify-center py-2 relative z-10">
+        <Logo />
       </div>
 
       {/* Main Game Area */}
-      <div className="flex flex-1 px-4 pb-4 gap-4">
+      <div className="flex flex-1 px-4 pb-4 gap-4 relative z-10">
         {/* Left Sidebar - Player List */}
-        <div className="w-64 bg-white rounded-lg overflow-hidden">
+        <div className="w-64 bg-white/90 backdrop-blur-sm rounded-lg overflow-hidden shadow-xl border border-white/20">
           <div className="flex items-center bg-gray-100 p-2">
-            <div className="bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center font-bold text-gray-700">
+            <div className="bg-gray-200 rounded-full w-10 h-10 flex items-center justify-center font-bold text-gray-700 animate-pulse-slow">
               {timeLeft}
             </div>
             <div className="ml-2 font-bold">
@@ -214,7 +276,10 @@ export default function GamePage() {
 
           <div className="divide-y">
             {players.map((player) => (
-              <div key={player.id} className={`flex items-center p-2 ${player.isDrawing ? "bg-gray-100" : ""}`}>
+              <div
+                key={player.id}
+                className={`flex items-center p-2 ${player.isDrawing ? "bg-gray-100" : ""} ${player.isDrawing ? "animate-pulse-slow" : ""}`}
+              >
                 <div className="w-8 text-right font-bold text-gray-700 mr-2">#{player.id}</div>
                 <div className="relative w-10 h-10 flex-shrink-0">
                   <Avatar color={player.color} />
@@ -231,81 +296,148 @@ export default function GamePage() {
         {/* Main Game Content */}
         <div className="flex-1 flex flex-col">
           {/* Word to Guess */}
-          <div className="bg-white rounded-lg p-3 mb-2 flex flex-col items-center">
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 mb-2 flex flex-col items-center shadow-xl border border-white/20">
             <div className="text-gray-700 font-bold mb-1">GUESS THIS</div>
-            <div className="text-2xl tracking-widest font-bold text-black">{currentWord}</div>
+            <div className="text-2xl tracking-widest font-bold">{currentWord}</div>
           </div>
 
-          {/* Drawing Canvas */}
-          <div className="flex-1 bg-white rounded-lg overflow-hidden relative">
-            {/* Thumbs up/down */}
-            <div className="absolute top-2 right-2 flex gap-2">
-              <button className="p-1 bg-green-100 rounded-full">
-                <ThumbsUp className="w-6 h-6 text-green-600" />
-              </button>
-              <button className="p-1 bg-red-100 rounded-full">
-                <ThumbsDown className="w-6 h-6 text-red-600" />
-              </button>
-            </div>
+          {/* Game Area with Canvas and Chat */}
+          <div className="flex-1 flex gap-2">
+            {/* Drawing Canvas */}
+            <div className="flex-1 bg-white rounded-lg overflow-hidden relative shadow-xl border border-white/20">
+              {/* Thumbs up/down */}
+              <div className="absolute top-2 right-2 flex gap-2 z-10">
+                <button className="p-1 bg-green-100 rounded-full hover:bg-green-200 transition-colors">
+                  <ThumbsUp className="w-6 h-6 text-green-600" />
+                </button>
+                <button className="p-1 bg-red-100 rounded-full hover:bg-red-200 transition-colors">
+                  <ThumbsDown className="w-6 h-6 text-red-600" />
+                </button>
+              </div>
 
-            {/* Drawing notification */}
-            <div className="absolute bottom-2 right-2 text-blue-600 font-bold">{currentDrawer} is drawing now!</div>
+              {/* Canvas */}
+              <div className="w-full h-full relative">
+                <canvas ref={canvasRef} className="absolute top-0 left-0 touch-none" style={{ cursor: "crosshair" }} />
+              </div>
 
-            {/* Canvas */}
-            <canvas ref={canvasRef} width={800} height={600} className="w-full h-full" />
-
-            {/* Drawing Tools - Only visible when it's your turn to draw */}
-            {players.find((p) => p.name === "poing (You)")?.isDrawing && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gray-100 p-2 flex items-center">
-                <div className="flex flex-wrap gap-1 mr-4">
+              {/* Drawing Tools */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gray-100/90 backdrop-blur-sm p-2 flex flex-wrap items-center gap-2 border-t border-gray-200">
+                <div className="flex flex-wrap gap-1 mr-2">
                   {colors.map((color) => (
                     <button
                       key={color}
-                      className={`w-6 h-6 rounded-sm ${currentColor === color ? "ring-2 ring-blue-500" : ""}`}
-                      style={{ backgroundColor: color }}
+                      className={`w-8 h-8 rounded-sm flex items-center justify-center ${currentColor === color ? "ring-2 ring-blue-500 transform scale-110 transition-transform" : "hover:scale-105 transition-transform"}`}
+                      style={{
+                        backgroundColor: color === "eraser" ? "#ffffff" : color,
+                        border: "1px solid #ccc",
+                      }}
                       onClick={() => setCurrentColor(color)}
-                    />
-                  ))}
-                </div>
-
-                <div className="flex gap-1 mr-4">
-                  {brushSizes.map((size) => (
-                    <button
-                      key={size}
-                      className={`w-8 h-8 rounded-sm flex items-center justify-center bg-white ${brushSize === size ? "ring-2 ring-blue-500" : ""}`}
-                      onClick={() => setBrushSize(size)}
                     >
-                      <div className="rounded-full bg-black" style={{ width: size, height: size }} />
+                      {color === "eraser" && (
+                        <div className="w-6 h-6 flex items-center justify-center">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <path d="M15 3h6v6"></path>
+                            <path d="m10 14 11-11"></path>
+                          </svg>
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
 
-                <button className="px-3 py-1 bg-red-500 text-white rounded-sm" onClick={clearCanvas}>
+                <div className="flex gap-1 mr-2">
+                  {brushSizes.map((size) => (
+                    <button
+                      key={size}
+                      className={`w-8 h-8 rounded-sm flex items-center justify-center bg-white ${brushSize === size ? "ring-2 ring-blue-500 transform scale-110 transition-transform" : "hover:scale-105 transition-transform"}`}
+                      style={{ border: "1px solid #ccc" }}
+                      onClick={() => setBrushSize(size)}
+                    >
+                      <div
+                        className="rounded-full"
+                        style={{
+                          width: size,
+                          height: size,
+                          backgroundColor: currentColor === "eraser" ? "#888888" : currentColor,
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  className="px-3 py-1 bg-red-500 text-white rounded-sm hover:bg-red-600 transition-colors transform hover:scale-105 active:scale-95"
+                  onClick={clearCanvas}
+                >
                   Clear
                 </button>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Guess Input */}
-          <div className="mt-2">
-            <input
-              type="text"
-              placeholder="Type your guess here..."
-              className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {/* Chat Container */}
+            <div className="w-64 bg-white/90 backdrop-blur-sm rounded-lg overflow-hidden shadow-xl border border-white/20 flex flex-col">
+              {/* Chat Messages */}
+              <div
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto p-2 space-y-2"
+                style={{ maxHeight: "calc(100% - 50px)" }}
+              >
+                {messages.map((message, index) => (
+                  <div key={index} className={`${message.type === "system" ? "text-center italic text-gray-500" : ""}`}>
+                    {message.type === "system" ? (
+                      <div className="bg-gray-100 rounded py-1 px-2 text-sm">{message.content}</div>
+                    ) : (
+                      <div className="flex items-start">
+                        <span className="font-bold mr-1" style={{ color: message.color }}>
+                          {message.player}:
+                        </span>
+                        <span className="text-gray-800">{message.content}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Chat Input */}
+              <form onSubmit={handleSendMessage} className="border-t border-gray-200 p-2 flex items-center">
+                <input
+                  type="text"
+                  placeholder="Type your guess here..."
+                  className="flex-1 bg-white p-2 rounded-l-md border-2 border-blue-500 focus:outline-none placeholder:text-gray-500 text-black"
+                  value={guessInput}
+                  onChange={(e) => setGuessInput(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 h-full transition-colors"
+                >
+                  <Send size={18} />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
         {/* Settings Button */}
-        <button className="absolute top-4 right-4 bg-gray-800 text-white p-2 rounded-full">
+        <button className="absolute top-4 right-4 bg-gray-800 text-white p-2 rounded-full hover:bg-gray-700 transition-colors z-20">
           <Settings className="w-6 h-6" />
         </button>
       </div>
 
       {/* Ad Banner */}
-      {/* <div className="absolute right-4 top-32 hidden lg:block"> */}
-      {/*   <div className="w-64 h-96 bg-gray-200 rounded overflow-hidden"> */}
+      {/* <div className="absolute right-4 top-32 hidden lg:block z-10"> */}
+      {/*   <div className="w-64 h-96 bg-gray-200 rounded overflow-hidden shadow-xl"> */}
       {/*     <Image */}
       {/*       src="/placeholder.svg?height=384&width=256" */}
       {/*       alt="Advertisement" */}

@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Dice1Icon as Dice } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dice1Icon as Dice, Pencil } from "lucide-react"
+import Logo from "../logo"
 
 export default function HeroPage() {
   const router = useRouter()
@@ -25,30 +26,12 @@ export default function HeroPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center relative"
-      style={{ backgroundColor: "#1a5cb0", backgroundImage: "url('/doodle-pattern.svg')" }}
+      className="min-h-screen flex flex-col items-center bg-sky-700 justify-center relative"
     >
       {/* Logo */}
       <div className="mb-4">
-        <div className="flex items-center justify-center">
-          <h1 className="text-6xl font-bold">
-            <span className="text-red-500">s</span>
-            <span className="text-orange-500">k</span>
-            <span className="text-yellow-400">r</span>
-            <span className="text-green-500">i</span>
-            <span className="text-cyan-400">b</span>
-            <span className="text-blue-500">b</span>
-            <span className="text-white">l</span>
-            <span className="text-pink-500">.</span>
-            <span className="text-indigo-500">i</span>
-            <span className="text-orange-500">o</span>
-            <span className="inline-block ml-1 transform rotate-12">
-              <div className="w-6 h-12 bg-orange-500 rounded-t-sm relative">
-                <div className="absolute top-0 w-6 h-2 bg-yellow-300"></div>
-                <div className="absolute bottom-0 left-1/2 w-1 h-3 bg-black transform -translate-x-1/2"></div>
-              </div>
-            </span>
-          </h1>
+        <div className="text-6xl flex items-center justify-center">
+          <Logo />
         </div>
 
         {/* Avatar Row */}
@@ -93,20 +76,20 @@ export default function HeroPage() {
             <ChevronRight size={24} />
           </button>
 
-          <button className="ml-6 bg-white p-1 rounded">
-            <Dice size={24} />
-          </button>
+          {/* <button className="ml-6 bg-white p-1 rounded"> */}
+          {/*   <Dice size={24} className="text-yellow-500" /> */}
+          {/* </button> */}
         </div>
 
         {/* Action Buttons */}
         <button
-          className="w-full bg-green-400 hover:bg-green-500 text-white font-bold py-3 px-4 rounded mb-3 text-2xl"
+          className="w-full bg-green-400 hover:bg-green-500 text-white font-bold py-3 px-4 rounded mb-3 text-2xl cursor-pointer"
           onClick={handlePlay}
         >
           Play!
         </button>
 
-        <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded text-xl">
+        <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded text-xl cursor-pointer">
           Create Private Room
         </button>
       </div>
