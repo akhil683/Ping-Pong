@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Dice1Icon as Dice, Pencil } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import Logo from "../logo"
 
 export default function HeroPage() {
@@ -110,7 +110,7 @@ export default function HeroPage() {
   )
 }
 
-function Avatar({ color, size = "small" }) {
+function Avatar({ color, size = "small" }: { color: string, size?: string }) {
   const sizeClass = size === "large" ? "w-16 h-16" : "w-8 h-8"
 
   return (
